@@ -5,6 +5,8 @@ from datasets import load_dataset
 from loguru import logger
 from parse import parse
 from pydantic import BaseModel, Extra
+import os
+from requests.exceptions import HTTPError
 
 
 class Entry(BaseModel):
@@ -118,17 +120,44 @@ class PluginVectorSearcher(BaseSearcher):
     """dataset name for plugin dataset"""
     dataset_split: str = "train"
     """split for that dataset"""
+    cache_dir: str = os.path.expanduser("/home/dpetresc/.cache/huggingface/datasets")
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Loading dataset to plugin datasets"""
         super().__init__(*args, **kwargs)
         # TODO @mpskex: expand supported knowledge base
-        assert self.dataset_name in (
-            ["wikipedia", "20220301.en"],
-            ["Cohere/wikipedia-22-12-en-embeddings"],
-        )
+        #assert self.dataset_name in (
+        #    ["wikipedia", "20220301.en"],
+        #    ["Cohere/wikipedia-22-12-en-embeddings"],
+        #)
         logger.info("load dataset...")
-        self.dataset = load_dataset(*self.dataset_name, split=self.dataset_split)
+        self.dataset = self.load_dataset_with_retry()
+        #self.dataset = load_dataset(*self.dataset_name, split=self.dataset_split)
+
+    def load_dataset_with_retry(self, max_retries=5, backoff_factor=1.0):
+        for attempt in range(max_retries):
+            try:
+                return load_dataset(
+                    *self.dataset_name,
+                    split=self.dataset_split,
+                    cache_dir=self.cache_dir,
+                )
+            except HTTPError as e:
+                if e.response.status_code == 429 and attempt < max_retries - 1:
+                    wait_time = backoff_factor * (2 ** attempt)
+                    logger.warning(f"Rate limit exceeded: {e}. Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Error loading dataset: {e}")
+                    raise
+            except Exception as e:
+                logger.error(f"An unexpected error occurred: {e}")
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor * (2 ** attempt)
+                    logger.warning(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    raise
 
     def para_id_to_entry(
         self, para_id: int, start_para_list: Optional[List[int]]

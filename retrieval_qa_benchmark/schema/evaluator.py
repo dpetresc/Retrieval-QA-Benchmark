@@ -71,6 +71,7 @@ class BaseEvaluator(BaseModel):
                             profile_avg=profile_avg,
                             profile_count=PROFILER.counter,
                             profile_time=PROFILER.accumulator,
+                            full_output=pred.full_output
                         )
                     )
                 elif type(d_) is QAPrediction:

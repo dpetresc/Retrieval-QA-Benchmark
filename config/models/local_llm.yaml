@@ -1,0 +1,13 @@
+type: "local-llm"
+args:
+  name: "meta-llama/Llama-2-13b-chat-hf"
+  system_prompt: ""
+    #record_template: "[INST]The following are multiple choice questions (with answers). Output only the letter corresponding to your answer (e.g., A, B, C, or D).\n\nQuestion: {question}\n{choices}[/INST]Answer: "
+  #record_template: "[INST]The following are multiple choice questions (with answers). Output only the letter corresponding to your answer (e.g., A, B, C, or D). If helpful, use the provided context to answer the question.\n\nContext: {context}\nQuestion: {question}\n{choices}[/INST]Answer: "
+  record_template: "[INST]The following are multiple choice questions (with answers). Output only the letter corresponding to your answer (e.g., A, B, C, or D). Use the provided context to answer the question.\n\nContext: {context}\nQuestion: {question}\n{choices}[/INST]Answer: "
+  hf_token: "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"
+run_args:
+  max_new_tokens: 3
+  temperature: 0.7
+  top_p: 0.9
+

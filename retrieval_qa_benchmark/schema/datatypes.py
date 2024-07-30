@@ -37,6 +37,7 @@ class QAPrediction(QARecord):
     """number of generated tokens"""
     generated: str
     """output from the model, is compared with the true answer in :class:`QARecord`"""
+    full_output: str = ""
     matched: float = 0.0
     """match score that measures how accurate this prediction is to the answer"""
     profile_time: Optional[Dict[str, Union[int, float]]] = {}
@@ -51,6 +52,7 @@ class BaseLLMOutput(BaseModel):
     generated: str
     prompt_tokens: int
     completion_tokens: int
+    full_output: str = ""
 
 
 class ToolHistory(BaseModel):

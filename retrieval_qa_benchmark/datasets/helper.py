@@ -16,7 +16,9 @@ def build_hfdataset_internal(
 ) -> Tuple[str, List[QARecord]]:
     if type(name) is str:
         name = [name]
+    print(name)
     data = load_dataset(*name, **kwargs)[eval_split]
+    print(data)
     try:
         eval_set: List[QARecord] = [
             transform(d)[1] for d in tqdm(data, desc="Converting dataset...")

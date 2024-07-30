@@ -5,9 +5,30 @@ from retrieval_qa_benchmark.transforms.searchers import (
     ElSearchSearcher,
     FaissSearcher,
     MyScaleSearcher,
+    CustomSearcher
 )
 from retrieval_qa_benchmark.utils.registry import REGISTRY
 
+@REGISTRY.register_transform("CustomSearcher")
+class ContextWithCustomSearcher(BaseContextTransform):
+    """_summary_
+
+    :inherited-members:
+    :param BaseContextTransform: _description_
+    :type BaseContextTransform: _type_
+    """
+
+    search_api_url: str
+    dataset_name: Sequence[str] = ["Cohere/wikipedia-2023-11-embed-multilingual-v3"]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._searcher = CustomSearcher(
+            search_api_url=self.search_api_url,
+            template=self.context_template,
+            dataset_name=self.dataset_name,
+            dataset_split="train",
+        )
 
 @REGISTRY.register_transform("Faiss")
 class ContextWithFaiss(BaseContextTransform):

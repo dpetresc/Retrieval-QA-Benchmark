@@ -1,4 +1,4 @@
 type: Faiss
 args: 
   num_selected: 5
-  index_path: "path-to-your-index"
+  index_path: "/mnt/nfs/home/dpetresc/Retrieval-QA-Benchmark/index/IVFSQ_IP.index"

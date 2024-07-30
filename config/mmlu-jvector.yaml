@@ -7,5 +7,5 @@ evaluator:
   model: !include models/local_llm.yaml
   transform:
     nodes:
-      - !include transforms/faiss.yaml
+      - !include transforms/jvector.yaml
   
