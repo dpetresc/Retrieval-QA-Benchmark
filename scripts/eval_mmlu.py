@@ -17,8 +17,8 @@ def get_model_name(config):
 
 p = ArgumentParser("Evaluation script for MMLU dataset")
 p.add_argument("--config", "-c", default="../config/mmlu.yaml")
-p.add_argument("--mmlu-subset", "-set", default="prehistory")
-#p.add_argument("--mmlu-subset", "-set", default="all")
+#p.add_argument("--mmlu-subset", "-set", default="prehistory")
+p.add_argument("--mmlu-subset", "-set", default="all")
 p.add_argument("--outdir", "-o", default="results")
 p.add_argument("--topk", "-k", default=5)
 

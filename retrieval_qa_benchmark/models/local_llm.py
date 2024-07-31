@@ -8,6 +8,7 @@ import torch
 from retrieval_qa_benchmark.schema.model import BaseLLM, BaseLLMOutput
 from retrieval_qa_benchmark.utils.profiler import PROFILER
 from retrieval_qa_benchmark.utils.registry import REGISTRY
+import gc
 
 
 @REGISTRY.register_model("local-llm")
@@ -48,6 +49,17 @@ class LocalLLM(BaseLLM):
             **kwargs,
         )
 
+    def log_gpu_memory_usage():
+        allocated = torch.cuda.memory_allocated() / (1024 ** 2)
+        max_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)
+        reserved = torch.cuda.memory_reserved() / (1024 ** 2)
+        max_reserved = torch.cuda.max_memory_reserved() / (1024 ** 2)
+        print(f"GPU Memory Allocated: {allocated:.2f} MB")
+        print(f"Max GPU Memory Allocated: {max_allocated:.2f} MB")
+        print(f"GPU Memory Reserved: {reserved:.2f} MB")
+        print(f"Max GPU Memory Reserved: {max_reserved:.2f} MB")
+
+
     def generate(self, text: str) -> BaseLLMOutput:
         input_text = "\n".join([self.system_prompt, text])
         inputs = self.tokenizer(input_text, return_tensors="pt").to(self.device)
@@ -59,7 +71,8 @@ class LocalLLM(BaseLLM):
         # Measure TTFT
         torch.cuda.synchronize()
         start_ttft = time.time()
-        next_logits, past_key_values = self.model(next_token_id, past_key_values=past_key_values, use_cache=True).to_tuple()
+        with torch.no_grad():
+            next_logits, past_key_values = self.model(next_token_id, past_key_values=past_key_values, use_cache=True).to_tuple()
         ttft = (time.time() - start_ttft) * 1000  # TTFT in ms
 
         # Append the first token
@@ -69,8 +82,9 @@ class LocalLLM(BaseLLM):
         # Measure TPOT for subsequent tokens
         torch.cuda.synchronize()
         start_tpot = time.time()
-        for _ in range(self.run_args.get("max_new_tokens", 50) - 1):
-            next_logits, past_key_values = self.model(next_token_id, past_key_values=past_key_values, use_cache=True).to_tuple()
+        for _ in range(self.run_args.get("max_new_tokens", 30) - 1):
+            with torch.no_grad():
+                next_logits, past_key_values = self.model(next_token_id, past_key_values=past_key_values, use_cache=True).to_tuple()
             next_token_id = torch.argmax(next_logits[:, -1:], dim=-1)
             generated_tokens.append(next_token_id.item())
 
@@ -108,6 +122,14 @@ class LocalLLM(BaseLLM):
 
         PROFILER.accumulator[self.tpot_key] += tpot
         PROFILER.counter[self.tpot_key] += 1
+
+        # Clear past_key_values to free up memory
+        past_key_values = None
+        torch.cuda.empty_cache()
+
+        # Garbage collection
+        del next_logits, next_token_id
+        gc.collect()
 
         return BaseLLMOutput(
             generated=generated_text,
@@ -160,3 +182,12 @@ class LocalLLM(BaseLLM):
 #            prompt_tokens=inputs["input_ids"].shape[1],
 #            full_output=generated_text
 #        )
+
+# Example usage
+#model_name = "meta-llama/Llama-2-13b-chat-hf"
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+#llm = LocalLLM.build(model_name, device)
+## Generate a long input sequence
+#long_input = "This is a test sentence. " * 250  # Adjust the multiplier to reach the desired token length
+#result = llm.generate(long_input)
+#print(result)
