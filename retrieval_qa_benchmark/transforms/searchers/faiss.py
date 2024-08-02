@@ -53,6 +53,7 @@ class FaissSearcher(PluginVectorSearcher):
         :return: distances and list of entries
         :rtype: Tuple[List[List[float]], List[List[Entry]]]
         """
+        #print("FAISS QUERY : ", query_list)
         if type(query_list[0]) == str:
             query_list = self.model.encode(query_list)
         assert type(query_list[0]) == np.ndarray

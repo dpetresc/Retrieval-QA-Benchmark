@@ -19,6 +19,11 @@ from retrieval_qa_benchmark.utils.profiler import PROFILER
 def default_matcher(x: str, y: QARecord) -> float:
     return float(x == y.answer)
 
+def load_sampled_questions(file_path: str) -> List[str]:
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    questions = [line.split("Question: ")[1].strip() for line in lines if line.startswith("Question: ")]
+    return questions
 
 class BaseEvaluator(BaseModel):
     """Base class for evaluators"""
@@ -28,9 +33,14 @@ class BaseEvaluator(BaseModel):
     transform: TransformGraph
     matcher: Callable[[str, QARecord], float] = default_matcher
     out_file: Optional[str] = None
+    sampled_questions_file: Optional[str] = None
 
     class Config:
         extra = Extra.forbid
+
+    def filter_sampled_questions(self, eval_set: List[QARecord]) -> List[QARecord]:
+        sampled_questions = load_sampled_questions(self.sampled_questions_file)
+        return [record for record in eval_set if record.question in sampled_questions]
 
     def __call__(self) -> Tuple[float, List[QAPrediction]]:
         """Main evaluator pipeline
@@ -44,7 +54,14 @@ class BaseEvaluator(BaseModel):
         """
         PROFILER.clear()
         result: List[QAPrediction] = []
-        for d in tqdm(self.dataset.eval_set, desc="Evaluating"):
+        
+        self.sampled_questions_file = "/mnt/nfs/home/dpetresc/Retrieval-QA-Benchmark/scripts/sampled_questions.txt"
+        eval_set = self.dataset.eval_set
+        if self.sampled_questions_file:
+            eval_set = self.filter_sampled_questions(eval_set)
+
+
+        for d in tqdm(eval_set, desc="Evaluating"):
             try:
                 d_ = self.transform(d)
                 if type(d_) is QARecord:

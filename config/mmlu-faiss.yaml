@@ -4,7 +4,8 @@ evaluator:
   dataset: !include datasets/mmlu.yaml
     #model: !include models/tgi-copy.yaml
   # model: !include models/remote-llama-13b.yaml
-  model: !include models/local_llm.yaml
+  #model: !include models/local_llm.yaml
+  model: !include models/local_llm-faiss.yaml
   transform:
     nodes:
       - !include transforms/faiss.yaml
