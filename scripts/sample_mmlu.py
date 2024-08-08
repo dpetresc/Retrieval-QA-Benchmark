@@ -18,7 +18,7 @@ for entry in dataset:
         subject_counts[subject] = 0
     subject_counts[subject] += 1
 
-subject_sample_counts = {subject: max(1, int(count * 0.1)) for subject, count in subject_counts.items()}
+subject_sample_counts = {subject: max(1, int(count * 0.5)) for subject, count in subject_counts.items()}
 
 # Sample 10% of each category
 sampled_questions = {}
