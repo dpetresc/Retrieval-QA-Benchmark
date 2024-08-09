@@ -28,42 +28,65 @@ def preproc_question4query(data: Dict[str, Any]) -> str:
 logger.info("Loading MMLU dataset...")
 dataset = load_dataset('cais/mmlu', 'all', split='test')
 
+print("Number of rows in dataset:", len(dataset))
+
 # Prepare queries
 queries = [{"question": d["question"], "choices": d["choices"]} for d in dataset]
 processed_queries = [preproc_question4query(query) for query in queries]
-questions = [query["question"] for query in queries]
 
-# Function to load or calculate query embeddings in batches
-def encode_queries_in_batches(queries: List[str], questions: List[str], model: str, embedding_file: str, batch_size: int = 100, delay: int = 60) -> List[Dict[str, Any]]:
-    embeddings_data = []
+print("NB processed queries ", len(processed_queries))
+
+# Function to load existing embeddings
+def load_existing_embeddings(embedding_file: str) -> Dict[str, Any]:
     if os.path.exists(embedding_file):
-        logger.info(f"Loading query embeddings from {embedding_file}...")
+        logger.info(f"Loading existing query embeddings from {embedding_file}...")
+        embeddings = {}
         with open(embedding_file, "r") as f:
-            embeddings_data = json.load(f)
+            for line in f:
+                embedding = json.loads(line)
+                embeddings[embedding["question"]] = embedding["embedding"]
+        logger.info(f"Loaded {len(embeddings)} existing query embeddings.")
+        return embeddings
+    return {}
 
-    start_index = len(embeddings_data)
-    total_batches = (len(queries) - start_index) // batch_size + (1 if (len(queries) - start_index) % batch_size != 0 else 0)
+# Function to append new embeddings to the file
+def append_embeddings_to_file(embedding_file: str, new_embeddings: Dict[str, Any]) -> None:
+    with open(embedding_file, "a") as f:
+        for question, embedding in new_embeddings.items():
+            f.write(json.dumps({"question": question, "embedding": embedding}) + "\n")
+
+# Function to encode queries in batches and append to file
+def encode_queries_in_batches(processed_queries: List[str], model: str, embedding_file: str, batch_size: int = 100, delay: int = 60) -> None:
+    existing_embeddings = load_existing_embeddings(embedding_file)
+    start_index = len(existing_embeddings)
+    logger.info(f"Starting index: {start_index}")
+
+    remaining_queries = [q for q in processed_queries if q not in existing_embeddings]
+    remaining_batches = len(remaining_queries) // batch_size + (1 if len(remaining_queries) % batch_size != 0 else 0)
     
-    for i in tqdm(range(start_index, len(queries), batch_size), desc="Calculating embeddings", unit="batch"):
-        batch_queries = queries[i:i + batch_size]
-        batch_questions = questions[i:i + batch_size]
+    for i in tqdm(range(0, len(remaining_queries), batch_size), total=remaining_batches, desc="Calculating embeddings", unit="batch"):
+        batch_queries = remaining_queries[i:i + batch_size]
+
+        logger.info(f"Processing batch starting at index {i}, batch size: {len(batch_queries)}")
+
         response = co.embed(texts=batch_queries, model=model, input_type="search_query")
+        if len(response.embeddings) != len(batch_queries):
+            logger.error(f"Mismatch in number of embeddings received: expected {len(batch_queries)}, got {len(response.embeddings)}")
+            continue
+
         batch_embeddings = response.embeddings
-        
-        for question, embedding in zip(batch_questions, batch_embeddings):
-            embeddings_data.append({"question": question, "embedding": embedding})
-        
-        # Save progress every batch
-        with open(embedding_file, "w") as f:
-            json.dump(embeddings_data, f)
-        
+
+        new_embeddings = {q: emb for q, emb in zip(batch_queries, batch_embeddings)}
+
+        # Append new embeddings to the file
+        append_embeddings_to_file(embedding_file, new_embeddings)
+        logger.info(f"Appended {len(new_embeddings)} new embeddings to {embedding_file}")
+
         time.sleep(delay)  # Respect rate limit
 
-    return embeddings_data
-
 # Encode queries
-embedding_file = "query_embeddings.json"
-query_embeddings = encode_queries_in_batches(processed_queries, questions, 'embed-multilingual-v3.0', embedding_file)
+embedding_file = "query_embeddings.jsonl"  # Use .jsonl for line-delimited JSON
+encode_queries_in_batches(processed_queries, 'embed-multilingual-v3.0', embedding_file)
 
 print(f"Embeddings saved to {embedding_file}")
 

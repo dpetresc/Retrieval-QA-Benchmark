@@ -6,10 +6,21 @@ from tqdm import tqdm
 from typing import List, Dict, Any
 
 # Load the query embeddings from a file
-def load_query_embeddings(embedding_file: str) -> List[Dict[str, Any]]:
+def load_query_embeddings(embedding_file: str) -> Dict[str, Any]:
     logger.info(f"Loading query embeddings from {embedding_file}...")
+    embeddings = {}
     with open(embedding_file, "r") as f:
-        return json.load(f)
+        for line in f:
+            embedding = json.loads(line)
+            embeddings[embedding["question"]] = embedding["embedding"]
+    logger.info(f"Loaded {len(embeddings)} query embeddings.")
+    return embeddings
+
+# Preprocess MMLU queries
+def preproc_question4query(data: Dict[str, Any]) -> str:
+    question = data["question"]
+    choices = " | ".join(data["choices"])
+    return "\n".join([question, choices])
 
 # Load the MMLU dataset
 logger.info("Loading MMLU dataset...")
@@ -17,15 +28,15 @@ dataset = load_dataset('cais/mmlu', 'all', split='test')
 
 # Prepare queries
 queries = [{"question": d["question"], "choices": d["choices"]} for d in dataset]
-questions = [query["question"] for query in queries]
+processed_queries = [preproc_question4query(query) for query in queries]
 
 # Load the query embeddings
-embedding_file = "query_embeddings.json"
+embedding_file = "query_embeddings.jsonl"
 query_embeddings_data = load_query_embeddings(embedding_file)
 
 # Convert to arrays for processing
-query_embeddings = np.array([item["embedding"] for item in query_embeddings_data])
-questions = [item["question"] for item in query_embeddings_data]
+query_embeddings = np.array([query_embeddings_data[pq] for pq in processed_queries if pq in query_embeddings_data])
+questions = [pq for pq in processed_queries if pq in query_embeddings_data]
 
 # Load the Cohere multilingual dataset
 logger.info("Loading Cohere multilingual dataset...")
