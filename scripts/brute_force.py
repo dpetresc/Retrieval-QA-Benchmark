@@ -73,10 +73,14 @@ def brute_force_search(query_embeddings: np.ndarray, doc_embeddings: np.ndarray,
     
     return all_results
 
-# Function to merge and keep the top-k results across batches
 def merge_top_k(existing_results: List[Dict[str, Any]], new_results: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
     combined_results = existing_results + new_results
     combined_results.sort(key=lambda x: x["score"], reverse=True)
+
+    # Re-rank after merging
+    for idx, result in enumerate(combined_results[:top_k]):
+        result["rank"] = idx + 1
+
     return combined_results[:top_k]
 
 # Function to save intermediate results to a file
